@@ -10,8 +10,7 @@
 
 
 ## Data Source:
-- [Dataset](./dataset/incom2024_delay_example_dataset.xlsx):  
-The dataset spans from January 2015 to December 2017 and contains 15,549 rows and 41 columns, which include customer, order, and logistics information.
+- [Dataset](./dataset/incom2024_delay_example_dataset.xlsx):   The dataset spans from January 2015 to December 2017 and contains 15,549 rows and 41 columns, which include customer, order, and logistics information.
 
 ## Final Report:
 - [Final Report](): Documentation for Business Data Mining Group Project.
