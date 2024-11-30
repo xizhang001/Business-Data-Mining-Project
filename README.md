@@ -17,8 +17,8 @@ The dataset spans from January 2015 to December 2017 and contains 15,549 rows an
 - [Final Report](): Documentation for Business Data Mining Group Project.
 
 ## R Codes:
-- [Data Mining Problem 1.RMD](./Codes/)
-- [Data Mining Problem 2.RMD](./Codes/)
+- [Data Mining Problem 1.Rmd](./R%Code/Data%Mining%Problem%1%-%Code.Rmd)
+- [Data Mining Problem 2.Rmd](./R%Code/Data%Mining%Problem%2%-%Code.Rmd)
   
-- [Data Mining Problem 1.pdf](./Codes/)
-- [Data Mining Problem 2.pdf](./Codes/)
+- [Data Mining Problem 1.pdf](./R%Code/Data%Mining%Problem%1%-%Code.pdf)
+- [Data Mining Problem 2.pdf](./R%Code/Data%Mining%Problem%2%-%Code.pdf)
