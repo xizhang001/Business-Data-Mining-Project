@@ -1,0 +1,516 @@
+---
+title: "Data mining problem 1"
+output: word_document
+date: "2024-10-27"
+---
+# Group 9 - Data-Driven Optimisation of Supply Chain Management
+
+## Data mining problem 1 - Analyse the factors that will result in an order delay
+
+```{r}
+# Load necessary libraries
+library(readxl)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(reshape2)
+library(corrplot)
+library(reshape2)
+library(rpart)
+library(caret)
+library(lattice)
+library(randomForest)
+library(forecast)
+library(pROC)
+library(tidyr)
+
+
+# Data mining problem 1 - Analyse the factors that will result in an order delay 
+
+# Load the dataset
+data <- read_excel("C:/Users/Xi/Desktop/incom2024_delay_example_dataset.xlsx")
+
+# Data Preprocessing
+data<- na.omit(data)
+data <- unique(data)
+data<- data[data$customer_state != '91732', ]
+
+# Label Transformation
+data <- data %>%
+  mutate(label = ifelse(label %in% c(-1, 0), 0, label)) %>%
+  mutate(label = case_when(
+    label == 0 ~ "Not Delayed",
+    label == 1 ~ "Delayed",
+    TRUE ~ as.character(label)  
+  ))
+data$label <- as.factor(data$label) 
+
+# Convert character columns to factors
+data <- data %>%mutate(across(where(is.character), as.factor))
+
+set.seed(42)
+# Create training set (40% of the data)
+train_index <- createDataPartition(data$label, p = 0.4, list = FALSE)
+train_data <- data[train_index, ]
+
+# Remaining data split into validation and testing sets (each 50% of the remaining 60%)
+temp_data <- data[-train_index, ]
+valid_index <- createDataPartition(temp_data$label, p = 0.5, list = FALSE)
+valid_data <- temp_data[valid_index, ]
+test_data <- temp_data[-valid_index, ]
+
+# Output the size of each dataset
+output <- paste("train:", nrow(train_data), 
+                ", valid:", nrow(valid_data), 
+                ", test:", nrow(test_data))
+cat(output, "\n")
+
+
+# Train a Random Forest Model (Partially explainable feature)
+rf_model <- randomForest(label ~ shipping_mode + order_region + category_name
+                                   + order_item_total_amount+ customer_state 
+                                   + customer_segment + department_name
+                                   + payment_type,
+                                   data = train_data, importance = TRUE)
+
+# Print the Random Forest model summary
+print(rf_model)
+```
+
+```{r}
+# Make predictions on the validation dataset
+rf_valid_predictions <- predict(rf_model, valid_data)
+
+# Evaluate model performance on the validation dataset
+confusion_matrix_valid <- confusionMatrix(
+  as.factor(rf_valid_predictions),  # Predicted labels
+  as.factor(valid_data$label)       # Actual labels
+)
+
+# Display the confusion matrix and evaluation metrics
+print(confusion_matrix_valid)
+
+```
+
+```{r}
+# Calculate precision, recall, and F1 score for the validation data
+valid_precisions_rf <- posPredValue(rf_valid_predictions, valid_data$label, positive = "Delayed")
+valid_recall_rf <- sensitivity(rf_valid_predictions, valid_data$label, positive = "Delayed")
+valid_f1_score_rf <- (2 * valid_precisions_rf * valid_recall_rf) / (valid_precisions_rf + valid_recall_rf)
+
+# Print precision, recall, and F1 score
+print(c("valid Precision" = valid_precisions_rf, "valid Recall" = valid_recall_rf, "valid F1 Score" = valid_f1_score_rf))
+
+# Calculate predicted probabilities for the validation dataset
+rf_valid_probabilities <- predict(rf_model, valid_data, type = "prob")
+positive_class_probabilities_v <- rf_valid_probabilities[, "Delayed"]
+
+# Generate the ROC curve for validation data
+roc_curve_v <- roc(valid_data$label, positive_class_probabilities_v)
+
+# Plot the ROC curve for validation data
+ggplot(data.frame(FPR = 1 - roc_curve_v$specificities, TPR = roc_curve_v$sensitivities), aes(x = FPR, y = TPR)) +
+  geom_line() +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "ROC Curve - valid data - Delayed as Positive Class",
+       x = "False Positive Rate (1 - Specificity)",
+       y = "True Positive Rate (Sensitivity)") +
+  xlim(0, 1) +  
+  ylim(0, 1) +  
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold")) 
+
+# Calculate AUC for the validation data
+auc_value_v <- auc(roc_curve_v)
+print(paste("AUC_v:", auc_value_v))
+```
+
+```{r}
+# Make predictions on the test dataset
+rf_test_predictions <- predict(rf_model, test_data)
+
+# Evaluate model performance on the test dataset using a confusion matrix
+confusion_matrix_test <- confusionMatrix(as.factor(rf_test_predictions), as.factor(test_data$label))
+
+# Print the confusion matrix and related statistics
+print(confusion_matrix_test)
+
+# Calculate precision, recall, and F1 score for the test data
+test_precisions_rf <- posPredValue(rf_test_predictions, test_data$label, positive = "Delayed")
+test_recall_rf <- sensitivity(rf_test_predictions, test_data$label, positive = "Delayed")
+test_f1_score_rf <- (2 * test_precisions_rf * test_recall_rf) / (test_precisions_rf + test_recall_rf)
+
+# Print precision, recall, and F1 score for the test data
+print(c("test Precision" = test_precisions_rf, "test Recall" = test_recall_rf, "test F1 Score" = test_f1_score_rf))
+```
+
+```{r}
+# Calculate predicted probabilities for the test dataset
+rf_test_probabilities <- predict(rf_model, test_data, type = "prob")
+positive_class_probabilities_t <- rf_test_probabilities[, "Delayed"]
+
+# Generate the ROC curve for the test dataset
+roc_curve_t <- roc(test_data$label, positive_class_probabilities_t)
+
+# Plot the ROC curve for the test dataset
+ggplot(data.frame(FPR = 1 - roc_curve_t$specificities, TPR = roc_curve_t$sensitivities), aes(x = FPR, y = TPR)) +
+  geom_line() +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "ROC Curve - test data - Delayed as Positive Class",
+       x = "False Positive Rate (1 - Specificity)",
+       y = "True Positive Rate (Sensitivity)") +
+  xlim(0, 1) +  
+  ylim(0, 1) +  
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold")) 
+  
+# Calculate AUC (Area Under the Curve) for the test dataset
+auc_value_t <- auc(roc_curve_t)
+print(paste("AUC_t:", auc_value_t))
+```
+
+```{r}
+# Print feature importance
+importance(rf_model)
+```
+
+
+```{r}
+# Plot the importance of features
+varImpPlot(rf_model,
+           main = "", 
+           col = "black",  
+           cex = 0.7)
+title(main = "Variable Importance Plot", line = 2, cex.main = 1.2, font.main = 2)
+```
+
+
+```{r}
+# Extract important features
+importance_values <- importance(rf_model)
+importance_df <- data.frame(
+  Feature = rownames(importance_values),
+  MeanDecreaseAccuracy = importance_values[, 'MeanDecreaseAccuracy'],
+  MeanDecreaseGini = importance_values[, 'MeanDecreaseGini'])
+
+# Important Features Chart
+ggplot(importance_df, aes(x = reorder(Feature, MeanDecreaseAccuracy), y = MeanDecreaseAccuracy)) +
+  geom_bar(stat = 'identity', fill = 'lightblue', color = "black") +
+  coord_flip() +
+  geom_text(aes(label = round(MeanDecreaseAccuracy, 2)), 
+            hjust = -0.2, size = 3, color = 'black') +
+  labs(title = 'Feature Importance - MeanDecreaseAccuracy - Random Forest', 
+       x = 'Features', 
+       y = 'Importance (Mean Decrease in Accuracy)') +
+  theme_minimal(base_size = 12) +  # Adjust base text size for better readability
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),  # Center and bold the title
+        axis.text.y = element_text(size = 10),  # Adjust text size for feature names
+        axis.text.x = element_text(size = 10))  # Adjust text size for the importance values
+```
+
+```{r}
+# Important Features Chart - Mean Decrease in Gini
+ggplot(importance_df, aes(x = reorder(Feature, MeanDecreaseGini), y = MeanDecreaseGini)) +
+  geom_bar(stat = 'identity', fill = 'lightblue', color = "black") +
+  coord_flip() +
+  geom_text(aes(label = round(MeanDecreaseGini, 2)), 
+            hjust = -0.2, size = 3, color = 'black') +
+  labs(title = 'Feature Importance - MeanDecreaseGini - Random Forest', 
+       x = 'Features', 
+       y = 'Importance (Mean Decrease in Gini)') +
+  theme_minimal(base_size = 12) +  # Adjust base text size for better readability
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),  # Center and bold the title
+        axis.text.y = element_text(size = 10),  # Adjust text size for feature names
+        axis.text.x = element_text(size = 10))  # Adjust text size for the importance values
+```
+
+```{r}
+# Calculate delay rates per shipping_mode
+delay_rate_shipping <- data %>%
+  group_by(shipping_mode) %>%
+  summarize(
+    Total_Orders = n(),
+    Delayed_Orders = sum(label == "Delayed")
+  ) %>%
+  mutate(Delay_Rate = (Delayed_Orders / Total_Orders) * 100)
+
+# View the calculated delay rates
+print(delay_rate_shipping)
+```
+
+```{r}
+# Plot the delay rates using ggplot2 with orange gradient and no X-axis rotation
+ggplot(delay_rate_shipping, aes(x = reorder(shipping_mode, -Delay_Rate), y = Delay_Rate, fill = Delay_Rate)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = sprintf("%.1f%%", Delay_Rate)), vjust = -0.5, size = 3) +
+  scale_fill_gradient(low = "limegreen", high = "seagreen") +  # Define gradient colors
+  labs(
+    title = "Delay Rates by Shipping Mode",
+    x = "Shipping Mode",
+    y = "Delay Rate (%)",
+    fill = "Delay Rate (%)"  # Add legend title for fill
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.x = element_text(angle = 0, hjust = 0.5)  # Remove rotation
+  ) +
+  ylim(0, max(delay_rate_shipping$Delay_Rate) * 1.1)  # Adds space for labels
+
+```
+
+```{r}
+# Calculate delay rates for each order_region
+delay_rate_region <- data %>%
+  group_by(order_region) %>%
+  summarize(
+    Total_Orders = n(),
+    Delayed_Orders = sum(label == "Delayed")
+  ) %>%
+  mutate(Delay_Rate = (Delayed_Orders / Total_Orders) * 100)
+
+# Select the top 10 regions with the highest delay rates
+top10_delay_region <- delay_rate_region %>%
+  arrange(desc(Delay_Rate)) %>%  # Sort by Delay_Rate in descending order
+  slice(1:10)                      # Select the top 10 rows
+
+# Plot the top 10 delay rates by order_region using ggplot2 with horizontal bars and color gradient
+ggplot(top10_delay_region, aes(x = reorder(order_region, Delay_Rate), y = Delay_Rate, fill = Delay_Rate)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = sprintf("%.1f%%", Delay_Rate)), 
+            hjust = -0.1, size = 3) +  # Adjust horizontal justification for better label placement
+  scale_fill_gradient(low = "paleturquoise", high = "lightseagreen") +  # Light to dark gradient
+  labs(
+    title = "Top 10 Order Regions by Delay Rate",
+    x = "Order Region",
+    y = "Delay Rate (%)",
+    fill = "Delay Rate (%)"  # Legend title for the fill
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.y = element_text(size = 10)  # Adjust Y-axis (formerly X-axis) text size if needed
+  ) +
+  ylim(0, max(top10_delay_region$Delay_Rate) * 1.1) +  # Adds space for labels
+  coord_flip()  # Flip the coordinates for horizontal bars
+```
+
+```{r}
+# Calculate delay rates per customer_state
+delay_rate_state <- data %>%
+  group_by(customer_state) %>%
+  summarize(
+    Total_Orders = n(),
+    Delayed_Orders = sum(label == "Delayed")
+  ) %>%
+  mutate(Delay_Rate = (Delayed_Orders / Total_Orders) * 100)
+
+# Select the top 10 states with the highest delay rates
+top10_delay_state <- delay_rate_state %>%
+  arrange(desc(Delay_Rate)) %>%  # Sort by Delay_Rate in descending order
+  slice(1:10)                      # Select the top 10 rows
+
+# Plot the top 10 delay rates by customer_state using ggplot2 with horizontal bars and color gradient
+ggplot(top10_delay_state, aes(x = reorder(customer_state, Delay_Rate), y = Delay_Rate, fill = Delay_Rate)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = sprintf("%.1f%%", Delay_Rate)), 
+            hjust = -0.1, size = 3) +  # Adjust horizontal justification for better label placement
+  scale_fill_gradient(low = "plum", high = "darkviolet") +  # Light to dark violet gradient
+  labs(
+    title = "Top 10 Customer States by Delay Rate",
+    x = "Customer State",
+    y = "Delay Rate (%)",
+    fill = "Delay Rate (%)"  # Legend title for the fill
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.y = element_text(size = 10)  # Adjust Y-axis (formerly X-axis) text size if needed
+  ) +
+  ylim(0, max(top10_delay_state$Delay_Rate) * 1.1) +  # Adds space for labels
+  coord_flip()  # Flip the coordinates for horizontal bars
+```
+```{r}
+# Calculate delay rates per category_name
+delay_rate_category <- data %>%
+  group_by(category_name) %>%
+  summarize(
+    Total_Orders = n(),
+    Delayed_Orders = sum(label == "Delayed")
+  ) %>%
+  mutate(Delay_Rate = (Delayed_Orders / Total_Orders) * 100)
+
+# Select the top 10 categories with the highest delay rates
+top10_delay_category <- delay_rate_category %>%
+  arrange(desc(Delay_Rate)) %>%  # Sort by Delay_Rate in descending order
+  slice(1:10)                     # Select the top 10 rows
+
+# Plot the top 10 delay rates by category_name using ggplot2 with horizontal bars and color gradient
+ggplot(top10_delay_category, aes(x = reorder(category_name, Delay_Rate), y = Delay_Rate, fill = Delay_Rate)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = sprintf("%.1f%%", Delay_Rate)), 
+            hjust = -0.1, size = 3) +  # Adjust horizontal justification for better label placement
+  scale_fill_gradient(low = "yellow", high = "gold") +  # Light to dark gradient
+  labs(
+    title = "Top 10 Categories by Delay Rate",
+    x = "Category Name",
+    y = "Delay Rate (%)",
+    fill = "Delay Rate (%)"  # Legend title for the fill
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.y = element_text(size = 10)  # Adjust Y-axis (formerly X-axis) text size if needed
+  ) +
+  ylim(0, max(top10_delay_category$Delay_Rate) * 1.1) +  # Adds space for labels
+  coord_flip()  # Flip the coordinates for horizontal bars
+```
+
+```{r}
+# Calculate delay rates per payment_type
+delay_rate_payment <- data %>%
+  group_by(payment_type) %>%
+  summarize(
+    Total_Orders = n(),
+    Delayed_Orders = sum(label == "Delayed")
+  ) %>%
+  mutate(Delay_Rate = (Delayed_Orders / Total_Orders) * 100)
+
+delay_rate_payment <- delay_rate_payment %>%
+  filter(!is.na(payment_type))  # Remove any NA payment types if present
+                      # Select the top 5 rows
+
+# Plot the delay rates by payment_type using ggplot2
+ggplot(delay_rate_payment, aes(x = reorder(payment_type, -Delay_Rate), y = Delay_Rate, fill = Delay_Rate)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = sprintf("%.1f%%", Delay_Rate)), vjust = -0.5, size = 3) +
+  scale_fill_gradient(low = "peachpuff", high = "salmon") +  # Light to dark gradient
+  labs(
+    title = "Delay Rates by Payment Type",
+    x = "Payment Type",
+    y = "Delay Rate (%)",
+    fill = "Delay Rate (%)"  # Legend title for the fill
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.x = element_text(angle = 0, hjust = 0.5)  # Keep X-axis labels horizontal
+  ) +
+  ylim(0, max(delay_rate_payment$Delay_Rate) * 1.1)  # Adds space for labels
+
+```
+
+
+```{r}
+# Calculate delay rates per customer_segment
+delay_rate_customer_segment <- data %>%
+  group_by(customer_segment) %>%
+  summarize(
+    Total_Orders = n(),
+    Delayed_Orders = sum(label == "Delayed")
+  ) %>%
+  mutate(Delay_Rate = (Delayed_Orders / Total_Orders) * 100)
+
+ggplot(delay_rate_customer_segment, aes(x = reorder(customer_segment, -Delay_Rate), y = Delay_Rate, fill = Delay_Rate)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = sprintf("%.1f%%", Delay_Rate)), vjust = -0.5, size = 3) +
+  scale_fill_gradient(low = "lightpink", high = "hotpink") +  
+   labs(
+    title = "Delay Rates by Customer Segment",
+    x = "Customer Segment",
+    y = "Delay Rate (%)",
+    fill = "Delay Rate (%)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.x = element_text(angle = 0, hjust = 0.5)   # Keep X-axis labels horizontal
+  ) +
+  ylim(0, max(delay_rate_customer_segment$Delay_Rate) * 1.1)  
+```
+
+
+```{r}
+# Calculate delay rates for each department_name
+delay_rate_department <- data %>%
+  group_by(department_name) %>%
+  summarize(
+    Total_Orders = n(),
+    Delayed_Orders = sum(label == "Delayed")
+  ) %>%
+  mutate(Delay_Rate = (Delayed_Orders / Total_Orders) * 100)
+
+# View the calculated delay rates
+print(delay_rate_department) 
+```
+
+```{r}
+
+# Plot the delay rates by department_name using ggplot2 with horizontal bars and color gradient
+ggplot(delay_rate_department, aes(x = reorder(department_name, Delay_Rate), y = Delay_Rate, fill = Delay_Rate)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = sprintf("%.1f%%", Delay_Rate)), 
+            hjust = -0.1, size = 3) +  # Adjust horizontal justification for better label placement
+  scale_fill_gradient(low = "#FFD580", high = "#FF8C00") +  # Gradient from light orange to dark orange
+  labs(
+    title = "Delay Rates by Department",
+    x = "Department Name",
+    y = "Delay Rate (%)",
+    fill = "Delay Rate (%)"  # Legend title for fill
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.y = element_text(size = 10)  # Adjust Y-axis (formerly X-axis) text size if needed
+  ) +
+  ylim(0, max(delay_rate_department$Delay_Rate) * 1.2) +  # Increase space to accommodate labels
+  coord_flip()  # Flip the coordinates for horizontal bars
+```
+
+```{r}
+
+# Calculate summary statistics for order_item_total_amount by delay status
+order_amount_summary <- data %>%
+  group_by(label) %>%
+  summarize(
+    Mean_Order_Amount = mean(order_item_total_amount, na.rm = TRUE),
+    Median_Order_Amount = median(order_item_total_amount, na.rm = TRUE),
+    Min_Order_Amount = min(order_item_total_amount, na.rm = TRUE),
+    Max_Order_Amount = max(order_item_total_amount, na.rm = TRUE),
+    SD_Order_Amount = sd(order_item_total_amount, na.rm = TRUE)
+  )
+print(order_amount_summary)
+```
+
+```{r}
+# Reshape the data to long format for plotting
+order_amount_long <- order_amount_summary %>%
+  pivot_longer(cols = Mean_Order_Amount:SD_Order_Amount,
+               names_to = "Statistic",
+               values_to = "Value")
+
+# Create a horizontal bar chart for order item total amount statistics
+ggplot(order_amount_long, aes(x = reorder(Statistic, Value), y = Value, fill = label)) +
+  geom_bar(stat = "identity", color = "black", position = "dodge", width = 0.7) +
+  coord_flip() +  # Flip for horizontal bars
+  geom_text(aes(label = round(Value, 2)), 
+            hjust = -0.1, size = 3, color = 'black', 
+            position = position_dodge(width = 0.7)) +  # Bring labels closer to the bars
+  labs(
+    title = "Summary Statistics for Order Item Total Amount by Delay Status",
+    x = "Statistics",
+    y = "Value",
+    fill = "Delay Status"
+  ) +
+  theme_minimal(base_size = 12) +  # Adjust base text size for readability
+  scale_fill_manual(values = c("#FF8C00", "#6BAED6")) +  # Customize colors
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),  # Center and bold the title
+    axis.text.y = element_text(size = 10),  # Adjust size of y-axis labels
+    axis.text.x = element_text(size = 10)   # Adjust size of x-axis values
+  ) +
+  expand_limits(y = max(order_amount_long$Value) * 1.1)  # Extend y-axis to create space for labels
+
+
+
+```
