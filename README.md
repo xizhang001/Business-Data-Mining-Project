@@ -21,8 +21,8 @@ To optimise supply chain management by reducing order delays and enhancing suppl
 - [Final Report](): Documentation for Business Data Mining Group Project.
 
 ## R Codes:
-- [Data Mining Problem 1.Rmd](./R%Code/Data%Mining%Problem%1%-%Code.Rmd)
-- [Data Mining Problem 2.Rmd](./R%Code/Data%Mining%Problem%2%-%Code.Rmd)
+- [Data Mining Problem 1.Rmd](./R%Code/Data_Mining_Problem_1_Code.Rmd)
+- [Data Mining Problem 2.Rmd](./R%Code/Data_Mining_Problem_2_Code.Rmd)
   
-- [Data Mining Problem 1.pdf](./R%Code/Data%Mining%Problem%1%-%Code.pdf)
-- [Data Mining Problem 2.pdf](./R%Code/Data%Mining%Problem%2%-%Code.pdf)
+- [Data Mining Problem 1.pdf](./R%Code/Data_Mining_Problem_1_Code.pdf)
+- [Data Mining Problem 2.pdf](./R%Code/Data_Mining_Problem_2_Code.pdf)
