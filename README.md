@@ -4,7 +4,9 @@
 
 #### Introduction:
 
-#### Data mining problem:
+#### Data mining goal:
+To optimise supply chain management by reducing order delays and enhancing supply chain capacity.
+
 1. Analyse the factors that will result in an order delay 
 2. How can we predict the future order demand in order to optimise supply chain capacity
 
@@ -12,6 +14,9 @@
 ## Data Source:
 - [Dataset](./dataset/incom2024_delay_example_dataset.xlsx):   The dataset spans from January 2015 to December 2017 and contains 15,549 rows and 41 columns, which include customer, order, and logistics information.
 
+## Slides:
+- [Slides](./Group%9%-%Slides.pdf): Presentation Sildes.
+  
 ## Final Report:
 - [Final Report](): Documentation for Business Data Mining Group Project.
 
