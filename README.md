@@ -23,10 +23,11 @@ To optimise supply chain management by reducing order delays and enhancing suppl
 ## R Codes:
 
 #### Rmd files:
+- [Model Comparison.Rmd](./R_Code/Model_Comparison.Rmd)
 - [Data Mining Problem 1.Rmd](./R_Code/Data_Mining_Problem_1_Code.Rmd)
 - [Data Mining Problem 2.Rmd](./R_Code/Data_Mining_Problem_2_Code.Rmd)
-- [Data Mining Problem 2.Rmd](./R_Code/Model_Comparison.Rmd)
 
 #### PDF files:
+- [Model Comparison.pdf](./R_Code/Model_Comparison.pdf)
 - [Data Mining Problem 1.pdf](./R_Code/Data_Mining_Problem_1_Code.pdf)
 - [Data Mining Problem 2.pdf](./R_Code/Data_Mining_Problem_2_Code.pdf)
