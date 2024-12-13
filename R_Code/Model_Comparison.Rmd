@@ -1,0 +1,171 @@
+---
+title: "Model Comparison"
+output: word_document
+date: "2024-12-12"
+---
+
+The analysis involves training and evaluating multiple machine learning algorithms, including Logistic Regression and Decision Tree, to compare their performance in terms of accuracy, precision, recall, F1 score, and AUC.
+
+```{r}
+# Load necessary libraries
+library(readxl)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(reshape2)
+library(corrplot)
+library(reshape2)
+library(rpart)
+library(caret)
+library(lattice)
+library(randomForest)
+library(forecast)
+library(pROC)
+library(tidyr)
+library(rpart.plot)
+
+#data
+data <- read_excel("D:/data mining data/incom2024_delay_example_dataset1.xlsx",
+                   sheet = 'incom2024_delay_example_dataset')
+
+#Data processing
+data<- na.omit(data)
+data <- unique(data)
+data<- data[data$customer_state != '91732', ]
+
+data <- data %>%
+  mutate(label = ifelse(label %in% c(-1, 0), 0, label)) %>%
+  mutate(label = case_when(
+    label == 0 ~ "Not Delayed",
+    label == 1 ~ "Delayed",
+    TRUE ~ as.character(label)  
+  ))
+data$label <- as.factor(data$label) 
+
+#Data processing
+data <- data %>%mutate(across(where(is.character), as.factor))
+
+data <- data %>% filter(customer_state != "OK")
+
+# Split the data into training 、testing sets and validation sets
+set.seed(42)
+train_index <- createDataPartition(data$label, p = 0.4, list = FALSE)
+train_data <- data[train_index, ]
+temp_data <- data[-train_index, ]
+
+valid_index <- createDataPartition(temp_data$label, p = 0.5, list = FALSE)
+valid_data <- temp_data[valid_index, ]
+test_data <- temp_data[-valid_index, ]
+```
+
+```{r}
+#Logistic regression model
+logistic_model <- glm(label ~ shipping_mode + order_region + category_name
+                                   + order_item_total_amount+ customer_state 
+                                   + customer_segment + department_name
+                                   + payment_type,
+                      data = train_data, family = "binomial")
+print(summary(logistic_model))
+
+logistic_predictions <- predict(logistic_model, test_data, type = "response")
+logistic_predictions <- ifelse(logistic_predictions > 0.5, "Delayed", "Not Delayed")
+conf_matrix <- confusionMatrix(as.factor(logistic_predictions), as.factor(test_data$label))
+
+# valid
+valid_predictions <- predict(logistic_model, newdata = valid_data, type = "response")
+valid_pred_labels <- ifelse(valid_predictions > 0.5, "Delayed", "Not Delayed")
+
+# test
+test_predictions <- predict(logistic_model, newdata = test_data, type = "response")
+test_pred_labels <- ifelse(test_predictions > 0.5, "Delayed", "Not Delayed")
+
+# caculate valid metrics
+valid_conf_matrix <- confusionMatrix(as.factor(valid_pred_labels), as.factor(valid_data$label))
+valid_accuracy <- valid_conf_matrix$overall["Accuracy"]
+valid_precision <- valid_conf_matrix$byClass["Precision"]
+valid_recall <- valid_conf_matrix$byClass["Recall"]
+valid_F1 <- valid_conf_matrix$byClass["F1"]
+valid_auc <- auc(valid_data$label, valid_predictions)
+
+# print valid results
+cat("Validation Set Metrics:\n")
+cat("Accuracy: ", valid_accuracy, "\n")
+cat("Precision: ", valid_precision, "\n")
+cat("Recall: ", valid_recall, "\n")
+cat("F1 Score: ", valid_F1, "\n")
+cat("AUC: ", valid_auc, "\n")
+
+# caculate test metrics
+test_conf_matrix <- confusionMatrix(as.factor(test_pred_labels), as.factor(test_data$label))
+test_accuracy <- test_conf_matrix$overall["Accuracy"]
+test_precision <- test_conf_matrix$byClass["Precision"]
+test_recall <- test_conf_matrix$byClass["Recall"]
+test_F1 <- test_conf_matrix$byClass["F1"]
+test_auc <- auc(test_data$label, test_predictions)
+
+# print test results
+cat("Test Set Metrics:\n")
+cat("Accuracy: ", test_accuracy, "\n")
+cat("Precision: ", test_precision, "\n")
+cat("Recall: ", test_recall, "\n")
+cat("F1 Score: ", test_F1, "\n")
+cat("AUC: ", test_auc, "\n")
+```
+
+```{r}
+# decision tree model
+decision_tree_model <- rpart(label ~ shipping_mode + order_region + category_name
+                                    + order_item_total_amount + customer_state 
+                                    + customer_segment + department_name
+                                    + payment_type,
+                             data = train_data, method = "class")
+
+print(decision_tree_model)
+
+# plot the decision tree
+rpart.plot(decision_tree_model)
+
+# predict on train set
+train_predictions <- predict(decision_tree_model, newdata = train_data, type = "class")
+
+# predict on validation set
+test_predictions <- predict(decision_tree_model, newdata = test_data, type = "class")
+
+# caculate train metrics
+train_conf_matrix <- confusionMatrix(factor(train_predictions), factor(train_data$label))
+
+train_accuracy <- train_conf_matrix$overall["Accuracy"]
+train_precision <- train_conf_matrix$byClass["Precision"]
+train_recall <- train_conf_matrix$byClass["Recall"]
+train_F1 <- train_conf_matrix$byClass["F1"]
+
+# caculate train AUC
+train_roc <- roc(train_data$label, as.numeric(train_predictions))
+train_AUC <- train_roc$auc
+
+# print train results
+cat("Accuracy: ", train_accuracy, 
+    "Precision: ", train_precision, 
+    "Recall: ", train_recall, 
+    "F1 Score: ", train_F1, 
+    "AUC: ", train_AUC, 
+    "\n")
+
+# caculate test metrics
+test_conf_matrix <- confusionMatrix(factor(test_predictions), factor(test_data$label))
+
+test_accuracy <- test_conf_matrix$overall["Accuracy"]
+test_precision <- test_conf_matrix$byClass["Precision"]
+test_recall <- test_conf_matrix$byClass["Recall"]
+test_F1 <- test_conf_matrix$byClass["F1"]
+
+# caculate test AUC
+test_roc <- roc(test_data$label, as.numeric(test_predictions))
+test_AUC <- test_roc$auc
+
+# print test results
+cat(" Precision: ", test_precision, 
+    " Recall: ", test_recall, 
+    " F1 Score: ", test_F1, 
+    " AUC: ", test_AUC, "\n")
+```
