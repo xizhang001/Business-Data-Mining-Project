@@ -3,6 +3,7 @@
 ### By Zihan Zheng, Xi Zhang, Chen Wang, Ning Xia and Yantong Xiang.
 
 #### Introduction:
+This project seeks to enhance demand forecasting and supply chain management by addressing critical factors that influence logistics performance. By employing Random Forest and ARIMA models, the analysis identifies key determinants of order delays and forecasts future demand trends. These insights facilitate proactive strategies aimed at minimising delays, aligning inventory with seasonal demand fluctuations, and improving overall logistics efficiency. The proposed recommendations are designed to support cost reduction initiatives, enhance customer satisfaction, and foster operational resilience.
 
 #### Data mining goal:
 To optimise supply chain management by reducing order delays and enhancing supply chain capacity.
